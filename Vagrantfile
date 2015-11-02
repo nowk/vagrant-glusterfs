@@ -1,40 +1,37 @@
+# -*- mode: ruby -*-
+# vim: set filetype=ruby :
+Vagrant.require_version ">= 1.6.0"
+VAGRANTFILE_API_VERSION = 2
 
-GLUSTERFS = "http://download.gluster.org/pub/gluster/glusterfs/3.7/3.7.5/Debian/jessie"
+BOX = "debian/jessie64"
 
-$script = <<SCRIPT
-wget -O - #{GLUSTERFS}/pub.key | apt-key add -
+servers = [
+  ["gluster-0", 1, 1024, "192.168.1.70"],
+  ["gluster-1", 1, 1024, "192.168.1.71"]
+]
 
-echo deb #{GLUSTERFS}/apt jessie main > /etc/apt/sources.list.d/gluster.list
-
-apt-get update
-apt-get install -y glusterfs-server
-
-mkdir -p /data/block1
-SCRIPT
-
-$size = 2
-
-Vagrant.configure(2) do |c|
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |c|
   c.vm.boot_timeout = 60
+  c.vm.box = BOX
 
-  c.vm.box = "debian/jessie64"
+  servers.each do |s|
+    name, cpus, memory, ip = s
 
-  $size.times do |n|
-    name = "gluster-#{n}"
+    c.vm.define name do |n|
+      n.vm.box_check_update = false
 
-    c.vm.define name do |g|
-      g.vm.hostname = name
-      g.vm.network "private_network", ip: "192.168.1.7#{n}"
+      n.vm.hostname = name
+      n.vm.network "private_network", ip: ip
 
-      g.vm.provision "shell", inline: $script
-
-      g.vm.provider :virtualbox do |vb|
+      n.vm.provider :virtualbox do |vb|
         vb.gui = false
-        vb.cpus = 1
-        vb.memory = 1024
+        vb.cpus = cpus
+        vb.memory = memory
 
         vb.customize "pre-boot", ['modifyvm', :id, '--nestedpaging', 'off']
       end
+
+      n.vm.provision "shell", path: "setup.sh"
     end
   end
 end
@@ -51,4 +48,3 @@ end
 # 127.0.0.1    gluster-1
 # 192.168.1.70 gluster-0
 
-# vim: set filetype=ruby :
